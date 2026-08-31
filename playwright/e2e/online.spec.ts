@@ -1,12 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 test('titulo da pagina', async ({ page }) => {
-  await page.goto('http://localhost:5174');
+  // Usa baseURL do playwright.config (http://localhost:5173)
+  await page.goto('/');
 
-  // Expect a title "to contain" a substring.
-  await page.getByTestId('header-logo').getByRole('img', { name: 'Velô by Papito' }).click();
-  await page.getByTestId('hero-section').getByRole('heading', { name: 'Velô Sprint' }).click();
+  await expect(page.getByTestId('header-logo').getByRole('img', { name: 'Velô' })).toBeVisible();
+  await expect(page.getByTestId('hero-section').getByRole('heading', { name: 'Velô Sprint' })).toBeVisible();
   await page.getByRole('link', { name: 'Consultar Pedido' }).click();
+  await expect(page).toHaveURL(/\/lookup/);
 });
-
-
