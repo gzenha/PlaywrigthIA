@@ -28,9 +28,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'yarn dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-  },
+  /* Só sobe Vite local se NÃO estiver testando uma URL remota (preview/prod). */
+  ...(process.env.BASE_URL && !/localhost|127\.0\.0\.1/.test(process.env.BASE_URL)
+    ? {}
+    : {
+        webServer: {
+          command: 'yarn dev',
+          url: 'http://localhost:5173',
+          reuseExistingServer: !process.env.CI,
+        },
+      }),
 });

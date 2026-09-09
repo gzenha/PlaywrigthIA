@@ -1,0 +1,136 @@
+# Continuous Deployment — Preview isolado + rebuild de Production
+#
+# Decisão do desafio (promote):
+# Variáveis VITE_* entram no bundle no BUILD. Um `vercel promote` do deploy
+# de preview levaria o Supabase de preview para produção.
+# Por isso, após o E2E no preview, fazemos um NOVO build com
+# --environment=production e deploy --prod (não reutilizamos o artifact de preview).
+
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+env:
+  NODE_VERSION: '24'
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_SCOPE: gisele8
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Lint
+        run: yarn lint
+
+  build-and-deploy-preview:
+    name: Build & Deploy Vercel Preview
+    needs: [quality]
+    runs-on: ubuntu-latest
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # Baixa env de PREVIEW → VITE_SUPABASE_* do banco isolado
+      - name: Pull Vercel Config (preview)
+        run: |
+          yarn vercel pull --yes \
+            --environment=preview \
+            --token=$VERCEL_TOKEN \
+            --scope=$VERCEL_SCOPE
+
+      - name: Build Vercel (preview)
+        run: yarn vercel build --token=$VERCEL_TOKEN
+
+      - name: Deploy preview
+        id: deploy
+        run: |
+          URL=$(yarn --silent vercel deploy --prebuilt \
+            --target=preview \
+            --token=$VERCEL_TOKEN \
+            --scope=$VERCEL_SCOPE)
+          echo "Preview URL: $URL"
+          echo "deployment-url=$URL" >> $GITHUB_OUTPUT
+
+  e2e-tests:
+    name: Run E2E Tests (against Preview)
+    needs: [build-and-deploy-preview]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: yarn playwright install --with-deps chromium
+      - name: Run E2E against Preview URL
+        run: yarn playwright test
+        env:
+          CI: true
+          BASE_URL: ${{ needs.build-and-deploy-preview.outputs.deployment-url }}
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+  # NÃO usamos `vercel promote` do preview.
+  # Rebuild com env de Production → bundle aponta para Supabase de produção.
+  deploy-production:
+    name: Build & Deploy Production
+    needs: [build-and-deploy-preview, e2e-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Pull Vercel Config (production)
+        run: |
+          yarn vercel pull --yes \
+            --environment=production \
+            --token=$VERCEL_TOKEN \
+            --scope=$VERCEL_SCOPE
+
+      - name: Build Vercel (production)
+        run: yarn vercel build --prod --token=$VERCEL_TOKEN
+
+      - name: Deploy production
+        run: |
+          yarn vercel deploy --prebuilt \
+            --prod \
+            --token=$VERCEL_TOKEN \
+            --scope=$VERCEL_SCOPE
