@@ -7,6 +7,7 @@ export function createConfiguratorActions(page: Page) {
   return {
     async open() {
       await page.goto('/configure')
+      await expect(page.getByTestId('total-price')).toBeVisible()
     },
 
     async selectColor(name: string) {
