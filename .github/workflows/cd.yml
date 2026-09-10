@@ -1,10 +1,7 @@
 # Continuous Deployment — Preview isolado + rebuild de Production
 #
-# Decisão do desafio (promote):
-# Variáveis VITE_* entram no bundle no BUILD. Um `vercel promote` do deploy
-# de preview levaria o Supabase de preview para produção.
-# Por isso, após o E2E no preview, fazemos um NOVO build com
-# --environment=production e deploy --prod (não reutilizamos o artifact de preview).
+# Decisão: não usamos `vercel promote` do preview (VITE_* ficam no bundle).
+# Depois do E2E, rebuild com --environment=production e deploy --prod.
 
 name: Continuous Deployment
 
@@ -19,7 +16,6 @@ env:
   VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-  VERCEL_SCOPE: gisele8
 
 jobs:
   build-and-deploy-preview:
@@ -37,13 +33,18 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      # Baixa env de PREVIEW → VITE_SUPABASE_* do banco isolado
-      - name: Pull Vercel Config (preview)
+      - name: Link Vercel project (from secrets)
         run: |
-          yarn vercel pull --yes \
-            --environment=preview \
-            --token=$VERCEL_TOKEN \
-            --scope=$VERCEL_SCOPE
+          mkdir -p .vercel
+          cat > .vercel/project.json <<EOF
+          {
+            "orgId": "${VERCEL_ORG_ID}",
+            "projectId": "${VERCEL_PROJECT_ID}"
+          }
+          EOF
+
+      - name: Pull Vercel Config (preview)
+        run: yarn vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
 
       - name: Build Vercel (preview)
         run: yarn vercel build --token=$VERCEL_TOKEN
@@ -53,8 +54,7 @@ jobs:
         run: |
           URL=$(yarn --silent vercel deploy --prebuilt \
             --target=preview \
-            --token=$VERCEL_TOKEN \
-            --scope=$VERCEL_SCOPE)
+            --token=$VERCEL_TOKEN)
           echo "Preview URL: $URL"
           echo "deployment-url=$URL" >> $GITHUB_OUTPUT
 
@@ -86,8 +86,6 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-  # NÃO usamos `vercel promote` do preview.
-  # Rebuild com env de Production → bundle aponta para Supabase de produção.
   deploy-production:
     name: Build & Deploy Production
     needs: [build-and-deploy-preview, e2e-tests]
@@ -102,12 +100,18 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Pull Vercel Config (production)
+      - name: Link Vercel project (from secrets)
         run: |
-          yarn vercel pull --yes \
-            --environment=production \
-            --token=$VERCEL_TOKEN \
-            --scope=$VERCEL_SCOPE
+          mkdir -p .vercel
+          cat > .vercel/project.json <<EOF
+          {
+            "orgId": "${VERCEL_ORG_ID}",
+            "projectId": "${VERCEL_PROJECT_ID}"
+          }
+          EOF
+
+      - name: Pull Vercel Config (production)
+        run: yarn vercel pull --yes --environment=production --token=$VERCEL_TOKEN
 
       - name: Build Vercel (production)
         run: yarn vercel build --prod --token=$VERCEL_TOKEN
@@ -116,5 +120,4 @@ jobs:
         run: |
           yarn vercel deploy --prebuilt \
             --prod \
-            --token=$VERCEL_TOKEN \
-            --scope=$VERCEL_SCOPE
+            --token=$VERCEL_TOKEN
