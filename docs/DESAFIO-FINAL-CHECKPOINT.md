@@ -14,8 +14,8 @@
 | 6. Redeploy Vercel Production | ✅ |
 | 7. Secrets GitHub (VERCEL_*) | ✅ |
 | 8. Pipeline CD (preview + E2E + rebuild prod) | ✅ arquivo `cd.yml` |
-| 9. Push / validar Actions | ⏳ |
-| 10. Documentar decisão do promote no PR | ⏳ |
+| 9. Push / validar Actions | ✅ verde (`f7f08b7` e anteriores) |
+| 10. Documentar decisão do promote no PR | ✅ `docs/DECISAO-PROMOTE.md` + PR de entrega |
 
 ---
 
