@@ -6,7 +6,10 @@ export function createConfiguratorActions(page: Page) {
 
   return {
     async open() {
-      await page.goto('/configure')
+      // Navega pela home + CTA (SPA) e também aceita deep-link /configure
+      await page.goto('/')
+      await page.getByTestId('hero-cta-primary').click()
+      await expect(page).toHaveURL(/\/configure/)
       await expect(page.getByTestId('total-price')).toBeVisible()
     },
 
