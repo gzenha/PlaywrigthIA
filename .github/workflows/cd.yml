@@ -36,25 +36,22 @@ jobs:
       - name: Link Vercel project (from secrets)
         run: |
           mkdir -p .vercel
-          cat > .vercel/project.json <<EOF
-          {
-            "orgId": "${VERCEL_ORG_ID}",
-            "projectId": "${VERCEL_PROJECT_ID}"
-          }
-          EOF
+          printf '%s' "{\"projectId\":\"${VERCEL_PROJECT_ID}\",\"orgId\":\"${VERCEL_ORG_ID}\"}" > .vercel/project.json
+          echo "Linked project.json:"
+          cat .vercel/project.json
 
       - name: Pull Vercel Config (preview)
-        run: yarn vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+        run: yarn vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
 
       - name: Build Vercel (preview)
-        run: yarn vercel build --token=$VERCEL_TOKEN
+        run: yarn vercel build --token="$VERCEL_TOKEN"
 
       - name: Deploy preview
         id: deploy
         run: |
           URL=$(yarn --silent vercel deploy --prebuilt \
             --target=preview \
-            --token=$VERCEL_TOKEN)
+            --token="$VERCEL_TOKEN")
           echo "Preview URL: $URL"
           echo "deployment-url=$URL" >> $GITHUB_OUTPUT
 
@@ -103,21 +100,17 @@ jobs:
       - name: Link Vercel project (from secrets)
         run: |
           mkdir -p .vercel
-          cat > .vercel/project.json <<EOF
-          {
-            "orgId": "${VERCEL_ORG_ID}",
-            "projectId": "${VERCEL_PROJECT_ID}"
-          }
-          EOF
+          printf '%s' "{\"projectId\":\"${VERCEL_PROJECT_ID}\",\"orgId\":\"${VERCEL_ORG_ID}\"}" > .vercel/project.json
+          cat .vercel/project.json
 
       - name: Pull Vercel Config (production)
-        run: yarn vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+        run: yarn vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
       - name: Build Vercel (production)
-        run: yarn vercel build --prod --token=$VERCEL_TOKEN
+        run: yarn vercel build --prod --token="$VERCEL_TOKEN"
 
       - name: Deploy production
         run: |
           yarn vercel deploy --prebuilt \
             --prod \
-            --token=$VERCEL_TOKEN
+            --token="$VERCEL_TOKEN"
