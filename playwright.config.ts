@@ -1,12 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.BASE_URL || 'http://localhost:5173';
+const isRemote = !/localhost|127\.0\.0\.1/.test(baseURL);
+
+const bypassHeaders = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  ? {
+      'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+      'x-vercel-set-bypass-cookie': 'true',
+    }
+  : undefined;
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
   timeout: 60_000,
   expect: {
-    timeout: 5_000,
+    timeout: 10_000,
   },
   testDir: './playwright/e2e',
   fullyParallel: true,
@@ -15,12 +25,11 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    baseURL,
     trace: 'on-first-retry',
-    actionTimeout: 5_000,
-    navigationTimeout: 30_000,
-    /* Desafio: rode com --headed ou descomente headless: false */
-    // headless: false,
+    actionTimeout: 10_000,
+    navigationTimeout: 60_000,
+    extraHTTPHeaders: bypassHeaders,
   },
   projects: [
     {
@@ -29,7 +38,7 @@ export default defineConfig({
     },
   ],
   /* Só sobe Vite local se NÃO estiver testando uma URL remota (preview/prod). */
-  ...(process.env.BASE_URL && !/localhost|127\.0\.0\.1/.test(process.env.BASE_URL)
+  ...(isRemote
     ? {}
     : {
         webServer: {
